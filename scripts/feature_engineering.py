@@ -15,6 +15,10 @@ def feature_engineering(input_path, train_path, test_path, test_ratio=0.3):
     # Drop rows with missing values in TotalCharges
     df = df.na.drop(subset=["TotalCharges"])
 
+    # Convert Churn to numeric using StringIndexer
+    churn_indexer = StringIndexer(inputCol="Churn", outputCol="Churn_indexed")
+    df = churn_indexer.fit(df).transform(df).drop("Churn").withColumnRenamed("Churn_indexed", "Churn")
+
     # Define columns
     num_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']
     cat_cols_ohe = ['PaymentMethod', 'Contract', 'InternetService']  # For one-hot encoding
