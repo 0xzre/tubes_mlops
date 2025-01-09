@@ -3,9 +3,10 @@ stages:
 
 test:
   stage: test
-  image: python:3.9
+  image: python:3.9  # Use a Python base image
+  before_script:
+    - pip install pytest pyspark  # Install required dependencies
   script:
-    - pip install pytest
     - pytest tests/
   tags:
     - docker
