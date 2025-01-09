@@ -1,5 +1,9 @@
+stages:
+  - test
+
 test:
   stage: test
+  image: python:3.9
   script:
     - pip install pytest
     - pytest tests/
