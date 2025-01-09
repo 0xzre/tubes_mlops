@@ -19,7 +19,7 @@ def model_training(train_path, test_path, model_path):
     auc = evaluator.evaluate(predictions)
     print(f"AUC: {auc}")
 
-    # Save the model
+    # Save the model to artifact TODO
     model.save(model_path)
     
     spark.stop()

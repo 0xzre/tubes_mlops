@@ -25,6 +25,7 @@ dag = DAG(
 # Define file paths
 spark_jobs_dir = 'scripts'
 data_dir = 'dataset'
+model_dir = 'models'
 
 # Tasks
 feature_engineering = SparkSubmitOperator(
@@ -48,7 +49,7 @@ model_training = SparkSubmitOperator(
     application_args=[
         f'{data_dir}/train_data.parquet',  # Input train data
         f'{data_dir}/test_data.parquet',  # Input test data
-        f'{data_dir}/model_output',  # Output model
+        f'{model_dir}/model_output',  # Output model
     ],
     dag=dag,
 )
