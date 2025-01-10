@@ -1,6 +1,18 @@
-# Tubes-MLOps-CustomerChurn
+# Tubes MLOps CustomerChurn Prediction
 
 
+
+# How to run with Docker
+1. Make sure you have good internet
+2. Run docker compose 
+```bash
+docker compose up -d
+```
+
+TODO:
+- CI/Cd
+- ML Model Saving and Serving Mechanism on HDFS(?)
+- Performance Monitoring
 
 ## Getting started
 

@@ -15,7 +15,7 @@ x-airflow-common:
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
-    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__FERNET_KEY: 'pQ-Ao6jNyBV5Hxq-5rE-i9z9OW6ZunyfaM7Pw1jV0-k=' # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
@@ -35,7 +35,10 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
-  user: "${AIRFLOW_UID:-50000}:0"
+    - ${AIRFLOW_PROJ_DIR:-.}/scripts:/opt/airflow/scripts
+    - ${AIRFLOW_PROJ_DIR:-.}/hadoop-config:/opt/hadoop/etc/hadoop
+    - ${AIRFLOW_PROJ_DIR:-.}/spark-config:/opt/spark/conf
+  user: "0:0"
   depends_on:
     &airflow-common-depends-on
     redis:
@@ -44,15 +47,60 @@ x-airflow-common:
       condition: service_healthy
 
 services:
-  mlflow:
-    image: ghcr.io/mlflow/mlflow:latest
-    container_name: mlflow-server
+  namenode:
+    image: apache/hadoop:3.4.1
+    container_name: namenode
+    hostname: namenode
     environment:
-      MLFLOW_TRACKING_URI: http://0.0.0.0:5000
-    ports:
-      - "5000:5000"
+      - CLUSTER_NAME=hadoop-cluster
     volumes:
-      - ./mlruns:/mlruns
+      - hadoop_namenode:/hadoop/dfs/name
+      - ./hadoop-config:/opt/hadoop/etc/hadoop
+      - ./hadoop-scripts:/opt/hadoop-scripts
+      # TODO : temporary solution to mount datasets, is there better way?
+      - ./datasets:/user/root/datasets
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    command: ["/opt/hadoop-scripts/start-hdfs.sh"]
+    user: "0:0"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9870"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  datanode:
+    image: apache/hadoop:3.4.1
+    container_name: datanode
+    hostname: datanode
+    volumes:
+      - hadoop_datanode:/hadoop/dfs/data
+      - ./hadoop-config:/opt/hadoop/etc/hadoop
+    command: ["hdfs", "datanode"]
+    user: "0:0"
+    depends_on:
+      - namenode
+
+  resourcemanager:
+    image: apache/hadoop:3.4.1
+    hostname: resourcemanager
+    volumes:
+      - ./hadoop-config:/opt/hadoop/etc/hadoop
+    ports:
+      - "8088:8088"
+    command: ["yarn", "resourcemanager"]
+    depends_on:
+      - namenode
+
+  nodemanager:
+    image: apache/hadoop:3.4.1
+    hostname: nodemanager
+    volumes:
+      - ./hadoop-config:/opt/hadoop/etc/hadoop
+    command: ["yarn", "nodemanager"]
+    depends_on:
+      - resourcemanager
 
   postgres:
     image: postgres:13
@@ -203,7 +251,9 @@ services:
           echo
         fi
         mkdir -p /sources/logs /sources/dags /sources/plugins
-        chown -R "${AIRFLOW_UID}:0" /sources/{logs,dags,plugins}
+        mkdir -p /hadoop/dfs/name /hadoop/dfs/data
+        chown -R "${AIRFLOW_UID}:0" /opt/airflow /sources/{logs,dags,plugins}
+        chmod -R 777 /hadoop/dfs/name /hadoop/dfs/data /opt/hadoop/logs
         exec /entrypoint airflow version
     # yamllint enable rule:line-length
     environment:
@@ -255,3 +305,5 @@ services:
 
 volumes:
   postgres-db-volume:
+  hadoop_namenode:
+  hadoop_datanode:
