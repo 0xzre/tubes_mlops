@@ -7,7 +7,7 @@ x-airflow-common:
   # and uncomment the "build" line below, Then run `docker-compose build` to build the images.
   # image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.10.4}
   build:
-    context: .
+    context: ml-pipeline
     dockerfile: Dockerfile
   environment:
     &airflow-common-env
@@ -31,13 +31,13 @@ x-airflow-common:
     # If you want to use it, outcomment it and replace airflow.cfg with the name of your config file
     # AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
   volumes:
-    - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
-    - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
-    - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
-    - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
-    - ${AIRFLOW_PROJ_DIR:-.}/scripts:/opt/airflow/scripts
-    - ${AIRFLOW_PROJ_DIR:-.}/hadoop-config:/opt/hadoop/etc/hadoop
-    - ${AIRFLOW_PROJ_DIR:-.}/spark-config:/opt/spark/conf
+    - ${AIRFLOW_PROJ_DIR:-.}/ml-pipeline/dags:/opt/airflow/dags
+    - ${AIRFLOW_PROJ_DIR:-.}/ml-pipeline/logs:/opt/airflow/logs
+    - ${AIRFLOW_PROJ_DIR:-.}/ml-pipeline/config:/opt/airflow/config
+    - ${AIRFLOW_PROJ_DIR:-.}/ml-pipeline/plugins:/opt/airflow/plugins
+    - ${AIRFLOW_PROJ_DIR:-.}/ml-pipeline/scripts:/opt/airflow/scripts
+    - ${AIRFLOW_PROJ_DIR:-.}/ml-pipeline/hadoop-config:/opt/hadoop/etc/hadoop
+    - ${AIRFLOW_PROJ_DIR:-.}/ml-pipeline/spark-config:/opt/spark/conf
   user: "0:0"
   depends_on:
     &airflow-common-depends-on
@@ -55,10 +55,8 @@ services:
       - CLUSTER_NAME=hadoop-cluster
     volumes:
       - hadoop_namenode:/hadoop/dfs/name
-      - ./hadoop-config:/opt/hadoop/etc/hadoop
-      - ./hadoop-scripts:/opt/hadoop-scripts
-      # TODO : temporary solution to mount datasets, is there better way?
-      - ./datasets:/user/root/datasets
+      - ./ml-pipeline/hadoop-config:/opt/hadoop/etc/hadoop
+      - ./ml-pipeline/hadoop-scripts:/opt/hadoop-scripts
     ports:
       - "9870:9870"
       - "9000:9000"
@@ -76,7 +74,7 @@ services:
     hostname: datanode
     volumes:
       - hadoop_datanode:/hadoop/dfs/data
-      - ./hadoop-config:/opt/hadoop/etc/hadoop
+      - ./ml-pipeline/hadoop-config:/opt/hadoop/etc/hadoop
     command: ["hdfs", "datanode"]
     user: "0:0"
     depends_on:
@@ -86,7 +84,7 @@ services:
     image: apache/hadoop:3.4.1
     hostname: resourcemanager
     volumes:
-      - ./hadoop-config:/opt/hadoop/etc/hadoop
+      - ./ml-pipeline/hadoop-config:/opt/hadoop/etc/hadoop
     ports:
       - "8088:8088"
     command: ["yarn", "resourcemanager"]
@@ -97,7 +95,7 @@ services:
     image: apache/hadoop:3.4.1
     hostname: nodemanager
     volumes:
-      - ./hadoop-config:/opt/hadoop/etc/hadoop
+      - ./ml-pipeline/hadoop-config:/opt/hadoop/etc/hadoop
     command: ["yarn", "nodemanager"]
     depends_on:
       - resourcemanager
@@ -118,8 +116,6 @@ services:
     restart: always
 
   redis:
-    # Redis is limited to 7.2-bookworm due to licencing change
-    # https://redis.io/blog/redis-adopts-dual-source-available-licensing/
     image: redis:7.2-bookworm
     expose:
       - 6379
@@ -265,7 +261,7 @@ services:
       _PIP_ADDITIONAL_REQUIREMENTS: ''
     user: "0:0"
     volumes:
-      - ${AIRFLOW_PROJ_DIR:-.}:/sources
+      - ${AIRFLOW_PROJ_DIR:-.}/ml-pipeline/:/sources
 
   airflow-cli:
     <<: *airflow-common
@@ -302,8 +298,46 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+  ml-server:
+    build: 
+      context: ml-server
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MLFLOW_MODEL_NAME=your_model_name
+      - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+    # depends_on:
+    #   - mlflow
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-storage:/var/lib/grafana
 
 volumes:
   postgres-db-volume:
   hadoop_namenode:
   hadoop_datanode:
+  grafana-storage:
