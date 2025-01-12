@@ -1,6 +1,22 @@
-# Tubes-MLOps-CustomerChurn
+# Tubes MLOps CustomerChurn Prediction
 
 
+
+# How to run with Docker
+1. Make sure you have good internet
+2. Run docker compose to build and run the services
+```bash
+docker compose up -d
+```
+3. To copy dataset to HDFS
+```bash
+./hadoop-scripts/copy-datasets.sh
+```
+
+TODO:
+- CI/Cd
+- ML Model Saving and Serving Mechanism on HDFS(?)
+- Performance Monitoring
 
 ## Getting started
 
