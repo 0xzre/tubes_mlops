@@ -1,4 +1,3 @@
-# main.py
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 import numpy as np
@@ -9,14 +8,21 @@ from prometheus_fastapi_instrumentator import Instrumentator
 import os
 from datetime import datetime
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="MLflow Model Server", version="1.0.0")
 
-# Add prometheus metrics
 Instrumentator().instrument(app).expose(app)
+
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
+MLFLOW_MODEL_NAME = os.getenv("MLFLOW_MODEL_NAME", "churn_log_reg")
+
+try:
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    logger.info(f"Connected to MLflow at: {MLFLOW_TRACKING_URI}")
+except Exception as e:
+    logger.error(f"Failed to connect to MLflow: {str(e)}")
 
 class PredictionRequest(BaseModel):
     features: List[List[float]]
@@ -27,37 +33,34 @@ class PredictionResponse(BaseModel):
     model_stage: str
     timestamp: str
 
-# Global variables
 model = None
 model_info = {
     "version": "none",
     "stage": "none",
     "last_loaded": None,
-    "name": os.getenv("MLFLOW_MODEL_NAME", "default_model")
+    "name": MLFLOW_MODEL_NAME
 }
 
 def load_production_model():
     """Load the latest production model from MLflow"""
     global model, model_info
     try:
-        # Get the latest production model
         client = mlflow.tracking.MlflowClient()
         
-        # Get latest version in production stage
         filter_string = f"name='{model_info['name']}'"
         versions = client.search_model_versions(filter_string)
-        prod_versions = [v for v in versions if v.current_stage == "Production"]
+        # use tag to filter
+        filtered_versions = [v for v in versions if v.tags.get("stage") == "Production"]
         
-        if not prod_versions:
+        if not filtered_versions:
             raise Exception("No production model found")
             
-        latest_version = sorted(prod_versions, key=lambda x: x.version, reverse=True)[0]
+        latest_version = sorted(filtered_versions, key=lambda x: x.version, reverse=True)[0]
         
-        # Load the model
+        # For rollback then, make the previous as the latest version
         model_uri = f"models:/{model_info['name']}/{latest_version.version}"
         model = mlflow.pyfunc.load_model(model_uri)
         
-        # Update model info
         model_info.update({
             "version": latest_version.version,
             "stage": "Production",
@@ -73,7 +76,10 @@ def load_production_model():
 @app.on_event("startup")
 async def startup_event():
     """Initialize the model on startup"""
-    load_production_model()
+    try:
+        load_production_model()
+    except Exception as e:
+        logger.error(f"Error loading model: {str(e)}")
 
 @app.get("/health")
 async def health_check():
@@ -92,13 +98,10 @@ async def predict(request: PredictionRequest, background_tasks: BackgroundTasks)
         raise HTTPException(status_code=503, detail="Model not loaded")
     
     try:
-        # Convert features to numpy array
         features = np.array(request.features)
         
-        # Make prediction
         predictions = model.predict(features)
         
-        # Convert numpy types to Python native types
         predictions = predictions.tolist()
         
         return PredictionResponse(

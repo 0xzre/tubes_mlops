@@ -2,17 +2,15 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 
-# Default DAG arguments
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 1,
-    'retry_delay': timedelta(minutes=5),
+    'retry_delay': timedelta(minutes=1),
 }
 
-# Define the DAG
 dag = DAG(
     'customer_churn_pipeline',
     default_args=default_args,
@@ -22,12 +20,9 @@ dag = DAG(
     catchup=False,
 )
 
-# Define file paths
 spark_jobs_dir = 'scripts'
 data_dir = 'dataset'
-model_dir = 'models'
 
-# Tasks
 feature_engineering = SparkSubmitOperator(
     task_id='feature_engineering',
     application=f'{spark_jobs_dir}/feature_engineering.py',
@@ -49,10 +44,8 @@ model_training = SparkSubmitOperator(
     application_args=[
         f'{data_dir}/train_data.parquet',  # Input train data
         f'{data_dir}/test_data.parquet',  # Input test data
-        f'{model_dir}/model_output',  # Output model
     ],
     dag=dag,
 )
 
-# Task dependencies
 feature_engineering >> model_training
