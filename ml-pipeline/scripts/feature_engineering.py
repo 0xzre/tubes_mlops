@@ -2,9 +2,27 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import col
 from pyspark.ml.feature import StandardScaler, VectorAssembler, StringIndexer, OneHotEncoder
 from pyspark.ml import Pipeline
+import os
+import mlflow
+import logging
+
+def init_mlflow(experiment_name: str):
+    """Initialize MLflow tracking."""
+    mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
+    mlflow.set_tracking_uri(mlflow_uri)
+
+    try:
+        mlflow.set_experiment(experiment_name, artifact_location="s3://mlflow")
+    except Exception:
+        pass
+
+    mlflow.set_experiment(experiment_name)
 
 def feature_engineering(input_path, train_path, test_path, test_ratio=0.3):
     spark = SparkSession.builder.appName("FeatureEngineering").getOrCreate()
+    
+    init_mlflow("feature_engineering")
+    mlflow.start_run(run_name="FeatureEngineering")
 
     # Load the data
     df = spark.read.csv(input_path, header=True, inferSchema=True)
@@ -58,6 +76,9 @@ def feature_engineering(input_path, train_path, test_path, test_ratio=0.3):
     # Save train and test sets
     train_data.write.mode("overwrite").parquet(train_path)
     test_data.write.mode("overwrite").parquet(test_path)
+    
+    # Save pipeline model
+    mlflow.spark.log_model(spark_model=pipeline_model,artifact_path="model",registered_model_name="feature_engineering")
     
     spark.stop()
 

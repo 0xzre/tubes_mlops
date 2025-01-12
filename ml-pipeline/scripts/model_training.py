@@ -9,9 +9,6 @@ from pyspark.sql.functions import col
 import os
 import logging
 from typing import Optional
-from sklearn.linear_model import LogisticRegression as skLogisticRegression
-import mlflow.pyfunc
-import pandas as pd
 
 def setup_logging():
     logging.basicConfig(
@@ -96,13 +93,19 @@ def model_training(
             prediction_df = predictions.select("prediction").limit(5).toPandas()
             signature = infer_signature(feature_df, prediction_df)
 
-            evaluator = BinaryClassificationEvaluator(
+            evaluator_auc = BinaryClassificationEvaluator(
                 labelCol="Churn", metricName="areaUnderROC"
             )
-            auc = evaluator.evaluate(predictions)
+            evaluator_pr = BinaryClassificationEvaluator(
+                labelCol="Churn", metricName="areaUnderPR"
+            )
+            auc = evaluator_auc.evaluate(predictions)
+            pr = evaluator_pr.evaluate(predictions)
             logging.info(f"Model AUC: {auc:.4f}")
+            logging.info(f"Model PR: {pr:.4f}")
 
             mlflow.log_metric("auc", auc)
+            mlflow.log_metric("pr", pr)
 
             # Input example
             train_data = train_data.withColumn(
@@ -118,9 +121,7 @@ def model_training(
                 input_example=input_example,
                 registered_model_name="churn_log_reg",
             )
-            # TODO log params
-
-            return auc
+            mlflow.log_params(lr.extractParamMap())
 
     except Exception as e:
         logging.error(f"Error in model training: {str(e)}")
