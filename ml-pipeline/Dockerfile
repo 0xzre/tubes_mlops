@@ -1,17 +1,13 @@
-# Use Apache Airflow official image
 FROM apache/airflow:2.10.4-python3.9
 
-# Install necessary libraries
 USER root
 RUN apt-get update && apt-get install -y gcc libpq-dev procps default-jre wget curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Set environment variables for Airflow
 ENV AIRFLOW_HOME=/opt/airflow
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 
-# Hadoop installation
 ENV HADOOP_VERSION=3.4.1
 ENV HADOOP_HOME=/opt/hadoop
 ENV HADOOP_CONF_DIR=/etc/hadoop
@@ -29,8 +25,7 @@ RUN HADOOP_URL="https://archive.apache.org/dist/hadoop/common/hadoop-$HADOOP_VER
     && mkdir "${HADOOP_HOME}/logs" \
     && mkdir /hadoop-data
 
-# Spark installation
-ENV SPARK_VERSION=3.5.4
+ENV SPARK_VERSION=3.5.3
 ENV SPARK_HOME=/opt/spark
 RUN wget https://downloads.apache.org/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop3.tgz && \
     tar -xzf spark-${SPARK_VERSION}-bin-hadoop3.tgz && \
@@ -41,7 +36,6 @@ ENV PATH="${SPARK_HOME}/bin:${HADOOP_HOME}/bin:${PATH}"
 
 # TODO on CI/CD : Copy DAGs and scripts
 
-# Switch to Airflow user
 USER airflow
 
 RUN pip install --upgrade pip && \

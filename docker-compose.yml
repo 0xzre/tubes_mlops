@@ -19,6 +19,7 @@ x-airflow-common:
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    MLFLOW_TRACKING_URI: http://mlflow:5000
     # yamllint disable rule:line-length
     # Use simple http server on scheduler for health checks
     # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server
@@ -102,6 +103,8 @@ services:
 
   postgres:
     image: postgres:13
+    container_name: postgres
+    hostname: postgres
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
@@ -276,9 +279,6 @@ services:
       - -c
       - airflow
 
-  # You can enable flower by adding "--profile flower" option e.g. docker-compose --profile flower up
-  # or by explicitly targeted on the command line e.g. docker-compose up flower.
-  # See: https://docs.docker.com/compose/profiles/
   flower:
     <<: *airflow-common
     command: celery flower
@@ -306,12 +306,12 @@ services:
       - "8000:8000"
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
-      - MLFLOW_MODEL_NAME=your_model_name
+      - MLFLOW_MODEL_NAME=churn_log_reg
       - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
-      - AWS_ACCESS_KEY_ID=minioadmin
-      - AWS_SECRET_ACCESS_KEY=minioadmin
-    # depends_on:
-    #   - mlflow
+      - AWS_ACCESS_KEY_ID=${MINIO_ACCESS_KEY}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_SECRET_ACCESS_KEY}
+    depends_on:
+      - mlflow
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -338,10 +338,9 @@ services:
 
   postgres_mlflow:
     image: postgres:latest
-    container_name: postgres
+    container_name: postgres_mlflow
+    hostname: postgres_mlflow
     restart: always
-    ports:
-      - "5432:5432"
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -354,6 +353,7 @@ services:
     restart: always
     image: quay.io/minio/minio
     container_name: minio
+    hostname: minio
     ports:
       - "9091:9000"
       - "9011:9001"
@@ -364,13 +364,18 @@ services:
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
-    depends_on:
-      - namenode
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9001"]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 5s
 
   minio-setup:
     image: quay.io/minio/mc
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
     volumes:
       - ./minio/create-bucket.sh:/create-bucket.sh
     entrypoint: /bin/sh
@@ -389,7 +394,7 @@ services:
     environment:
       - AWS_ACCESS_KEY_ID=${MINIO_ACCESS_KEY}
       - AWS_SECRET_ACCESS_KEY=${MINIO_SECRET_ACCESS_KEY}
-      - MLFLOW_S3_ENDPOINT_URL=${MLFLOW_S3_ENDPOINT}
+      - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
       - MLFLOW_S3_IGNORE_TLS=true
     command: >
       mlflow server
@@ -398,7 +403,7 @@ services:
       --serve-artifacts
       --artifacts-destination s3://mlflow
     depends_on:
-      - postgres
+      - postgres_mlflow
       - minio-setup
 
 volumes:
