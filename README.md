@@ -1,109 +1,123 @@
-# Tubes MLOps CustomerChurn Prediction
+# Customer Churn Prediction MLOps Pipeline 🤓
+
+An end-to-end MLOps pipeline for customer churn prediction, designed for scalability and reproducibility. This project is developed as part of the requirements for **X-Ops IF4054** 👽. The solution leverages **Apache Spark** for big data processing, **Apache Airflow** for workflow orchestration, and **MLflow** for experiment tracking and model management. The project includes workflows for data preprocessing, drift detection, retraining, and deployment tracking.
+
+---
+
+## Overview
+
+A scalable, reproducible, and automated pipeline to predict customer churn for a telecom dataset, addressing key MLOps/DataOps challenges like data drift monitoring and model retraining.
+
+### Key Features
+1. **Data Cleanup Pipeline**:
+   - Handles nulls and empty strings.
+   - Performs feature engineering using Apache Spark.
+
+2. **Drift Simulation and Monitoring**:
+   - Simulates data drift using custom workflows.
+   - Utilizes **Population Stability Index (PSI)** for drift detection.
+
+3. **Automated Model Retraining**:
+   - Monitors drift and triggers retraining workflows in Apache Airflow.
+   - Tracks model performance and lifecycle using MLflow.
+
+4. **Deployment and Monitoring**:
+   - Models deployed and served with Docker.
+   - Includes CI/CD workflows via GitLab for streamlined deployment.
+
+---
+
+## Dataset
+
+**Source**: [Telco Customer Churn Dataset](https://www.kaggle.com/datasets/blastchar/telco-customer-churn/code)
+
+- **Target Variable**: `Churn`
 
 
+---
 
-# How to run with Docker
-1. Make sure you have good internet
-2. Run docker compose to build and run the services
-```bash
-docker compose up -d
-```
-3. To copy dataset to HDFS
-```bash
-./hadoop-scripts/copy-datasets.sh
-```
+## Tools and Technologies
 
-TODO:
-- CI/Cd
-- ML Model Saving and Serving Mechanism on HDFS(?)
-- Performance Monitoring
+- **Apache Spark**: Data preprocessing and feature engineering.
+- **Apache Airflow**: Workflow orchestration and scheduling.
+- **MLflow**: Experiment tracking, model registry, and deployment.
+- **Docker**: Containerization.
+- **GitLab CI/CD**: Continuous integration and deployment.
+- **HDFS**: Distributed storage for datasets and models.
+- **FastAPI**: REST API for model serving.
+- **Prometheus & Grafana**: Monitoring and visualization for deployed models in ML Server.
 
-## Getting started
+---
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Installation and Setup
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+### Prerequisites
 
-## Add your files
+Ensure the following are installed on your system:
+- Docker
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+### Running with Docker
 
-```
-cd existing_repo
-git remote add origin https://gitlab.informatika.org/snoopidog/tubes-mlops-customerchurn.git
-git branch -M main
-git push -uf origin main
-```
+1. Build and run the services (Might take 1 hrs):
+   ```bash
+    docker-compose up --build -d
+    ```
+2. Access the Airflow UI at `http://localhost:8080` and MLflow UI at `http://localhost:5001`.
+3. Run the Airflow DAGs at Airflow UI or configure DAG on mounted `ml-pipeline/dags` folder.
+4. Hit the ML Server at `http://localhost:8000` for model serving.
 
-## Integrate with your tools
+---
 
-- [ ] [Set up project integrations](https://gitlab.informatika.org/snoopidog/tubes-mlops-customerchurn/-/settings/integrations)
+## Workflow Details
 
-## Collaborate with your team
+### 1. Data Cleanup Pipeline
+- **Purpose**: Handle missing values, empty strings, and data preprocessing.
+- **Implementation**: 
+  - Apache Spark is used for data transformations and cleaning.
+  - The pipeline ensures all features are appropriately scaled and encoded for modeling.
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+### 2. Drift Simulation
+- **Purpose**: Simulate and monitor data drift.
+- **Implementation**: 
+  - Custom workflows simulate drifted datasets to test model robustness.
+  - **Population Stability Index (PSI)** is calculated to detect significant shifts in data distribution.
 
-## Test and Deploy
+### 3. Drift Monitoring and Automated Retraining
+- **Purpose**: Detect drift in real-time and trigger retraining workflows.
+- **Implementation**:
+  - Apache Airflow monitors data and model performance.
+  - When PSI exceeds a threshold, an automated retraining process is triggered.
+  - The retrained models are versioned and logged in MLflow.
 
-Use the built-in continuous integration in GitLab.
+### 4. Deployment and Monitoring
+- **Purpose**: Serve models and track performance.
+- **Implementation**:
+  - Models are containerized using Docker.
+  - Monitoring systems track key performance metrics and ensure model health.
+  - CI/CD workflows with GitLab manage seamless deployments and updates.
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+---
 
-***
+## CI/CD Pipeline
 
-# Editing this README
+The CI/CD pipeline automates:
+- Testing of the codebase especially the ML pipeline to ensure quality.
+- ML Model training and deployment.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+---
 
-## Suggestions for a good README
+## Future Enhancements
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+- Use Kubernetes for container orchestration.
+- Add support for real-time data streaming for near-instant drift detection.
+- Building and pushing Docker images to a container registry for CD.
 
-## Name
-Choose a self-explaining name for your project.
+---
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+## Contributors
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+| Name                        | NIM      | Contributions                                                      |
+|-----------------------------|----------|--------------------------------------------------------------------|
+| Rizky Abdillah Rasyid       | 13521109 | MLFlow setup, ML models registry, Data drift simulation and detection.                            |
+| Muhammad Abdul Aziz Ghazali | 13521128 | Apache Airflow Deployment, Container environment and orchestration, ML Model serving and Continous Delivery |
+| Muhammad Zaki Amanullah     | 13521128 | Experimentation of machine learning model, codebase CI/CD pipeline.             |
